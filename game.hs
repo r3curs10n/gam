@@ -9,17 +9,10 @@ data HackTree = EmptyNode
 
 data GameState = GameState { tree :: HackTree, turn :: Color} deriving (Show)
 
-mor :: [Bool] -> IO Bool
-mor lst = return $ or lst
-
-mnor :: [Bool] -> IO Bool
-mnor lst = return $ not (or lst)
-
-isMovePossible :: Color -> HackTree -> IO Bool
-isMovePossible player EmptyNode = return False
-isMovePossible player (HackNode {color = c, children=chil})
-	| c == player || c == Green = return True
-	| otherwise = mor =<< (sequence (map (isMovePossible player) chil))
+isMovePossible :: GameState-> Bool
+isMovePossible GameState{turn=player, tree=HackNode{color=c, children=chil}}
+	| c == player || c == Green = True
+	| otherwise = or [ isMovePossible GameState{turn=player, tree=c} | c <- chil]
 
 rand n = getStdRandom (randomR (0,n))
 
@@ -39,12 +32,6 @@ makeRootBlack :: HackTree -> IO HackTree
 makeRootBlack EmptyNode = return EmptyNode
 makeRootBlack HackNode {color=_, children=chil, hid=h} = return HackNode{color=Black, children=chil, hid=h}
 
-initialGameState = do
-	HackNode{children=subtrees} <- makeRandomTree "" 1 3 3
-	subtrees' <- sequence (map makeRootBlack subtrees)
-	htree <- return HackNode {children=subtrees', hid="1", color=Black}
-	return GameState{tree=htree, turn=Red}
-
 rem1edge :: Color -> HackTree -> [HackTree]
 rem1edge player root@HackNode{children=chil, color=rc, hid=rid} = do
 	x@HackNode{color=c} <- chil
@@ -56,14 +43,47 @@ genStatesFrom :: GameState -> [GameState]
 genStatesFrom GameState{tree=htree, turn=player} = [ GameState{tree=t, turn=nextPlayer} | t <- (rem1edge player htree)] where
 	nextPlayer = if player == Red then Blue else Red
 
-isWinningState :: GameState -> IO Bool
-isWinningState gs@GameState{tree=htree, turn=player} = do
-	pos <- isMovePossible player htree
-	if not pos then return False else mnor =<< (sequence (map isWinningState (genStatesFrom gs)))
+isWinningState :: GameState -> Bool
+isWinningState gs@GameState{tree=htree, turn=player}
+	| not $ isMovePossible gs = False
+	| otherwise = not $ or (map isWinningState (genStatesFrom gs))
+
+remEdge :: String -> HackTree -> HackTree
+remEdge label HackNode{children=chil, color=rc, hid=rid} = HackNode{children=nc, color=rc, hid=rid} where
+	nc = [remEdge label c | c@HackNode{hid=x} <- chil, x /= label]
+
+aiMove :: GameState -> GameState
+aiMove gs@GameState{tree=htree, turn=player} = if length winningStates == 0 then head allStates else head winningStates where
+	winningStates = filter (\x -> not (isWinningState x)) allStates
+	allStates = genStatesFrom gs
 
 test = do
 	state <- initialGameState
 	putStrLn $ show state
-	isW <- isWinningState state
+	isW <- return $ isWinningState state
 	putStrLn $ show isW
 
+play :: GameState -> IO ()
+play gs@GameState{turn=player, tree=htree} = do
+	putStrLn $ show gs
+	if not (isMovePossible gs) then gameOver else
+		if player == Red then userPlays else aiPlays where
+			userPlays = do
+				putStrLn "Your move:"
+				e <- getLine
+				play GameState{turn=nextPlayer, tree=remEdge e htree}
+			aiPlays = do
+				play $ aiMove gs
+			nextPlayer = if player == Red then Blue else Red
+			gameOver = do
+				putStrLn "Game Over!"
+
+main = do
+	state <- initialGameState
+	play state
+
+initialGameState = do
+	HackNode{children=subtrees} <- makeRandomTree "" 1 2 2
+	subtrees' <- sequence (map makeRootBlack subtrees)
+	htree <- return HackNode {children=subtrees', hid="1", color=Black}
+	return GameState{tree=htree, turn=Red}
