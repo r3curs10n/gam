@@ -83,7 +83,7 @@ main = do
 	play state
 
 initialGameState = do
-	HackNode{children=subtrees} <- makeRandomTree "" 1 2 2
+	HackNode{children=subtrees} <- makeRandomTree "" 1 3 2
 	subtrees' <- sequence (map makeRootBlack subtrees)
 	htree <- return HackNode {children=subtrees', hid="1", color=Black}
 	return GameState{tree=htree, turn=Red}
