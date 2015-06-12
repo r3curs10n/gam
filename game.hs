@@ -1,3 +1,4 @@
+module Game where
 import System.Random
 import Control.Monad
 
@@ -78,12 +79,12 @@ play gs@GameState{turn=player, tree=htree} = do
 			gameOver = do
 				putStrLn "Game Over!"
 
-main = do
+main2 = do
 	state <- initialGameState
 	play state
 
 initialGameState = do
-	HackNode{children=subtrees} <- makeRandomTree "" 1 3 2
+	HackNode{children=subtrees} <- makeRandomTree "" 1 4 2
 	subtrees' <- sequence (map makeRootBlack subtrees)
 	htree <- return HackNode {children=subtrees', hid="1", color=Black}
 	return GameState{tree=htree, turn=Red}
